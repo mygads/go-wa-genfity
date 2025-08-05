@@ -14,6 +14,7 @@ type IUserManagementRepository interface {
 type IUserManagementUsecase interface {
 	CreateUser(request CreateUserRequest) (*UserResponse, error)
 	GetUser(id int) (*UserResponse, error)
+	GetUserByUsername(username string) (*UserResponse, error)
 	GetAllUsers() ([]UserResponse, error)
 	UpdateUser(id int, request UpdateUserRequest) (*UserResponse, error)
 	DeleteUser(id int) error

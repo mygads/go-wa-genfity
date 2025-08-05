@@ -17,6 +17,7 @@ import (
 	pkgError "github.com/aldinokemal/go-whatsapp-web-multidevice/pkg/error"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/pkg/utils"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/ui/websocket"
+	"github.com/gofiber/fiber/v2"
 	"github.com/sirupsen/logrus"
 	"go.mau.fi/whatsmeow"
 	"go.mau.fi/whatsmeow/appstate"
@@ -159,6 +160,31 @@ func UpdateGlobalClient(newCli *whatsmeow.Client, newDB *sqlstore.Container) {
 // GetClient returns the current global client instance (alias for GetGlobalClient)
 func GetClient() *whatsmeow.Client {
 	return cli
+}
+
+// GetClientFromContext returns the WhatsApp client for the current user from fiber context
+func GetClientFromContext(c interface{}) *whatsmeow.Client {
+	// Try to get user session from context if fiber context is provided
+	if fiberCtx, ok := c.(*fiber.Ctx); ok {
+		if session, exists := fiberCtx.Locals("user_session").(*UserSession); exists && session != nil {
+			return session.Client
+		}
+
+		// Try to get user ID from context as fallback
+		if userID, exists := fiberCtx.Locals("user_id").(int); exists {
+			sessionManager := GetSessionManager()
+			return sessionManager.GetUserClient(userID)
+		}
+	}
+
+	// Fallback to global client for backward compatibility
+	return cli
+}
+
+// GetClientForUser returns the WhatsApp client for a specific user ID
+func GetClientForUser(userID int) *whatsmeow.Client {
+	sessionManager := GetSessionManager()
+	return sessionManager.GetUserClient(userID)
 }
 
 // Get DB instance
@@ -747,6 +773,11 @@ func handlePresence(_ context.Context, evt *events.Presence) {
 }
 
 func handleHistorySync(ctx context.Context, evt *events.HistorySync, chatStorageRepo domainChatStorage.IChatStorageRepository) {
+	if evt == nil || evt.Data == nil {
+		log.Warnf("Received nil HistorySync event or data")
+		return
+	}
+
 	id := atomic.AddInt32(&historySyncID, 1)
 	fileName := fmt.Sprintf("%s/history-%d-%s-%d-%s.json",
 		config.PathStorages,

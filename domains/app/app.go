@@ -14,6 +14,17 @@ type IAppUsecase interface {
 	FetchDevices(ctx context.Context) (response []DevicesResponse, err error)
 }
 
+// IAppUsecaseWithContext extends IAppUsecase with context-aware methods
+type IAppUsecaseWithContext interface {
+	IAppUsecase
+	LoginWithContext(appCtx *AppContext) (response LoginResponse, err error)
+	LoginWithCodeAndContext(appCtx *AppContext, phoneNumber string) (loginCode string, err error)
+	LogoutWithContext(appCtx *AppContext) (err error)
+	ReconnectWithContext(appCtx *AppContext) (err error)
+	FirstDeviceWithContext(appCtx *AppContext) (response DevicesResponse, err error)
+	FetchDevicesWithContext(appCtx *AppContext) (response []DevicesResponse, err error)
+}
+
 type DevicesResponse struct {
 	Name   string `json:"name"`
 	Device string `json:"device"`

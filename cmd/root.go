@@ -44,7 +44,7 @@ var (
 	chatStorageRepo domainChatStorage.IChatStorageRepository
 
 	// Usecase
-	appUsecase        domainApp.IAppUsecase
+	appUsecase        domainApp.IAppUsecaseWithContext
 	chatUsecase       domainChat.IChatUsecase
 	sendUsecase       domainSend.ISendUsecase
 	userUsecase       domainUser.IUserUsecase

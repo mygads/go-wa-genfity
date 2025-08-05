@@ -57,8 +57,9 @@ func (u *userManagementUsecase) CreateUser(request domainUserManagement.CreateUs
 		return nil, fmt.Errorf("failed to create user: %w", err)
 	}
 
-	// Get WhatsApp connection status
-	isConnected, isLoggedIn, _ := whatsapp.GetConnectionStatus()
+	// Get WhatsApp connection status for new user (will be false initially)
+	sessionManager := whatsapp.GetSessionManager()
+	isConnected, isLoggedIn, _ := sessionManager.GetUserConnectionStatus(user.ID)
 
 	return &domainUserManagement.UserResponse{
 		ID:          user.ID,
@@ -94,17 +95,44 @@ func (u *userManagementUsecase) GetUser(id int) (*domainUserManagement.UserRespo
 	}, nil
 }
 
+func (u *userManagementUsecase) GetUserByUsername(username string) (*domainUserManagement.UserResponse, error) {
+	user, err := u.userRepo.GetByUsername(username)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get user by username: %w", err)
+	}
+	if user == nil {
+		return nil, fmt.Errorf("user not found")
+	}
+
+	// Get WhatsApp connection status for this specific user
+	sessionManager := whatsapp.GetSessionManager()
+	isConnected, isLoggedIn, _ := sessionManager.GetUserConnectionStatus(user.ID)
+
+	return &domainUserManagement.UserResponse{
+		ID:          user.ID,
+		Username:    user.Username,
+		IsActive:    user.IsActive,
+		IsConnected: isConnected,
+		IsLoggedIn:  isLoggedIn,
+		CreatedAt:   user.CreatedAt,
+		UpdatedAt:   user.UpdatedAt,
+	}, nil
+}
+
 func (u *userManagementUsecase) GetAllUsers() ([]domainUserManagement.UserResponse, error) {
 	users, err := u.userRepo.GetAll()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get all users: %w", err)
 	}
 
-	// Get WhatsApp connection status once for all users
-	isConnected, isLoggedIn, _ := whatsapp.GetConnectionStatus()
+	// Get user-specific connection statuses instead of global status
+	sessionManager := whatsapp.GetSessionManager()
 
 	var responses []domainUserManagement.UserResponse
 	for _, user := range users {
+		// Get connection status for this specific user
+		isConnected, isLoggedIn, _ := sessionManager.GetUserConnectionStatus(user.ID)
+
 		responses = append(responses, domainUserManagement.UserResponse{
 			ID:          user.ID,
 			Username:    user.Username,
@@ -159,8 +187,9 @@ func (u *userManagementUsecase) UpdateUser(id int, request domainUserManagement.
 		return nil, fmt.Errorf("failed to get updated user: %w", err)
 	}
 
-	// Get WhatsApp connection status
-	isConnected, isLoggedIn, _ := whatsapp.GetConnectionStatus()
+	// Get WhatsApp connection status for this specific user
+	sessionManager := whatsapp.GetSessionManager()
+	isConnected, isLoggedIn, _ := sessionManager.GetUserConnectionStatus(id)
 
 	return &domainUserManagement.UserResponse{
 		ID:          updatedUser.ID,

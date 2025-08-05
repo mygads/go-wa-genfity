@@ -7,14 +7,15 @@ import (
 	domainApp "github.com/aldinokemal/go-whatsapp-web-multidevice/domains/app"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/whatsapp"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/pkg/utils"
+	"github.com/aldinokemal/go-whatsapp-web-multidevice/ui/rest/middleware"
 	"github.com/gofiber/fiber/v2"
 )
 
 type App struct {
-	Service domainApp.IAppUsecase
+	Service domainApp.IAppUsecaseWithContext
 }
 
-func InitRestApp(app fiber.Router, service domainApp.IAppUsecase) App {
+func InitRestApp(app fiber.Router, service domainApp.IAppUsecaseWithContext) App {
 	rest := App{Service: service}
 	app.Get("/app/login", rest.Login)
 	app.Get("/app/login-with-code", rest.LoginWithCode)
@@ -27,7 +28,10 @@ func InitRestApp(app fiber.Router, service domainApp.IAppUsecase) App {
 }
 
 func (handler *App) Login(c *fiber.Ctx) error {
-	response, err := handler.Service.Login(c.UserContext())
+	// Create app context with user information
+	appCtx := domainApp.NewAppContext(c.UserContext(), c)
+
+	response, err := handler.Service.LoginWithContext(appCtx)
 	utils.PanicIfNeeded(err)
 
 	return c.JSON(utils.ResponseData{
@@ -42,7 +46,10 @@ func (handler *App) Login(c *fiber.Ctx) error {
 }
 
 func (handler *App) LoginWithCode(c *fiber.Ctx) error {
-	pairCode, err := handler.Service.LoginWithCode(c.UserContext(), c.Query("phone"))
+	// Create app context with user information
+	appCtx := domainApp.NewAppContext(c.UserContext(), c)
+
+	pairCode, err := handler.Service.LoginWithCodeAndContext(appCtx, c.Query("phone"))
 	utils.PanicIfNeeded(err)
 
 	return c.JSON(utils.ResponseData{
@@ -56,7 +63,10 @@ func (handler *App) LoginWithCode(c *fiber.Ctx) error {
 }
 
 func (handler *App) Logout(c *fiber.Ctx) error {
-	err := handler.Service.Logout(c.UserContext())
+	// Create app context with user information
+	appCtx := domainApp.NewAppContext(c.UserContext(), c)
+
+	err := handler.Service.LogoutWithContext(appCtx)
 	utils.PanicIfNeeded(err)
 
 	return c.JSON(utils.ResponseData{
@@ -68,7 +78,10 @@ func (handler *App) Logout(c *fiber.Ctx) error {
 }
 
 func (handler *App) Reconnect(c *fiber.Ctx) error {
-	err := handler.Service.Reconnect(c.UserContext())
+	// Create app context with user information
+	appCtx := domainApp.NewAppContext(c.UserContext(), c)
+
+	err := handler.Service.ReconnectWithContext(appCtx)
 	utils.PanicIfNeeded(err)
 
 	return c.JSON(utils.ResponseData{
@@ -80,7 +93,10 @@ func (handler *App) Reconnect(c *fiber.Ctx) error {
 }
 
 func (handler *App) Devices(c *fiber.Ctx) error {
-	devices, err := handler.Service.FetchDevices(c.UserContext())
+	// Create app context with user information
+	appCtx := domainApp.NewAppContext(c.UserContext(), c)
+
+	devices, err := handler.Service.FetchDevicesWithContext(appCtx)
 	utils.PanicIfNeeded(err)
 
 	return c.JSON(utils.ResponseData{
@@ -92,7 +108,20 @@ func (handler *App) Devices(c *fiber.Ctx) error {
 }
 
 func (handler *App) ConnectionStatus(c *fiber.Ctx) error {
-	isConnected, isLoggedIn, deviceID := whatsapp.GetConnectionStatus()
+	// Get user-specific connection status
+	userID, hasUserID := middleware.GetUserIDFromContext(c)
+
+	var isConnected, isLoggedIn bool
+	var deviceID string
+
+	if hasUserID {
+		// Get status for specific user
+		sessionManager := whatsapp.GetSessionManager()
+		isConnected, isLoggedIn, deviceID = sessionManager.GetUserConnectionStatus(userID)
+	} else {
+		// Fallback to global status
+		isConnected, isLoggedIn, deviceID = whatsapp.GetConnectionStatus()
+	}
 
 	return c.JSON(utils.ResponseData{
 		Status:  200,

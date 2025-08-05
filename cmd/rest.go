@@ -3,7 +3,6 @@ package cmd
 import (
 	"fmt"
 	"net/http"
-	"strings"
 
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/config"
 	infraUserManagement "github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/usermanagement"
@@ -82,24 +81,8 @@ func restServer(_ *cobra.Command, _ []string) {
 	adminGroup := apiGroup.Group("/admin", middleware.AdminBasicAuth())
 	rest.InitRestUserManagement(adminGroup, userManagementUsecase)
 
-	// Apply user authentication middleware globally, but skip for admin routes and static assets
-	apiGroup.Use(func(c *fiber.Ctx) error {
-		path := c.Path()
-
-		// Skip authentication for admin routes and static assets
-		if strings.HasPrefix(path, "/admin") ||
-			strings.HasPrefix(path, "/statics") ||
-			strings.HasPrefix(path, "/components") ||
-			strings.HasPrefix(path, "/assets") {
-			return c.Next()
-		}
-
-		// Apply user authentication for all other routes including homepage
-		return middleware.UserBasicAuth(userManagementUsecase)(c)
-	})
-
-	// Homepage route (now protected with user authentication)
-	apiGroup.Get("/", func(c *fiber.Ctx) error {
+	// Homepage route (protected with basic user authentication but not session middleware)
+	apiGroup.Get("/", middleware.UserBasicAuth(userManagementUsecase), func(c *fiber.Ctx) error {
 		return c.Render("views/index", fiber.Map{
 			"AppHost":        fmt.Sprintf("%s://%s", c.Protocol(), c.Hostname()),
 			"AppVersion":     config.AppVersion,
@@ -110,16 +93,22 @@ func restServer(_ *cobra.Command, _ []string) {
 		})
 	})
 
-	// Rest routes (existing functionality with user auth protection)
-	rest.InitRestApp(apiGroup, appUsecase)
-	rest.InitRestChat(apiGroup, chatUsecase)
-	rest.InitRestSend(apiGroup, sendUsecase)
-	rest.InitRestUser(apiGroup, userUsecase)
-	rest.InitRestMessage(apiGroup, messageUsecase)
-	rest.InitRestGroup(apiGroup, groupUsecase)
-	rest.InitRestNewsletter(apiGroup, newsletterUsecase)
+	// Routes with basic user authentication only (for login, status, etc.)
+	basicUserRoutes := apiGroup.Group("/", middleware.UserBasicAuth(userManagementUsecase))
 
-	websocket.RegisterRoutes(apiGroup, appUsecase)
+	// App routes that need session middleware (for operations requiring active WhatsApp session)
+	sessionUserRoutes := apiGroup.Group("/", middleware.UserSessionMiddleware(userManagementUsecase, chatStorageRepo))
+
+	// Initialize REST routes with appropriate middleware
+	rest.InitRestApp(basicUserRoutes, appUsecase)                 // Login doesn't need session
+	rest.InitRestChat(sessionUserRoutes, chatUsecase)             // Chat operations need session
+	rest.InitRestSend(sessionUserRoutes, sendUsecase)             // Send operations need session
+	rest.InitRestUser(basicUserRoutes, userUsecase)               // User info doesn't need session
+	rest.InitRestMessage(sessionUserRoutes, messageUsecase)       // Message operations need session
+	rest.InitRestGroup(sessionUserRoutes, groupUsecase)           // Group operations need session
+	rest.InitRestNewsletter(sessionUserRoutes, newsletterUsecase) // Newsletter operations need session
+
+	websocket.RegisterRoutes(basicUserRoutes, appUsecase)
 	go websocket.RunHub()
 
 	// Set auto reconnect to whatsapp server after booting

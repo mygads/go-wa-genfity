@@ -1,6 +1,7 @@
 package rest
 
 import (
+	domainApp "github.com/aldinokemal/go-whatsapp-web-multidevice/domains/app"
 	domainSend "github.com/aldinokemal/go-whatsapp-web-multidevice/domains/send"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/pkg/utils"
 	"github.com/gofiber/fiber/v2"
@@ -33,7 +34,10 @@ func (controller *Send) SendText(c *fiber.Ctx) error {
 
 	utils.SanitizePhone(&request.Phone)
 
-	response, err := controller.Service.SendText(c.UserContext(), request)
+	// Create app context with user information
+	appCtx := domainApp.NewAppContext(c.UserContext(), c)
+
+	response, err := controller.Service.SendText(appCtx, request)
 	utils.PanicIfNeeded(err)
 
 	return c.JSON(utils.ResponseData{
@@ -58,7 +62,10 @@ func (controller *Send) SendImage(c *fiber.Ctx) error {
 
 	utils.SanitizePhone(&request.Phone)
 
-	response, err := controller.Service.SendImage(c.UserContext(), request)
+	// Create app context with user information
+	appCtx := domainApp.NewAppContext(c.UserContext(), c)
+
+	response, err := controller.Service.SendImage(appCtx, request)
 	utils.PanicIfNeeded(err)
 
 	return c.JSON(utils.ResponseData{
@@ -80,7 +87,8 @@ func (controller *Send) SendFile(c *fiber.Ctx) error {
 	request.File = file
 	utils.SanitizePhone(&request.Phone)
 
-	response, err := controller.Service.SendFile(c.UserContext(), request)
+	appCtx := domainApp.NewAppContext(c.UserContext(), c)
+	response, err := controller.Service.SendFile(appCtx, request)
 	utils.PanicIfNeeded(err)
 
 	return c.JSON(utils.ResponseData{
@@ -103,7 +111,8 @@ func (controller *Send) SendVideo(c *fiber.Ctx) error {
 
 	utils.SanitizePhone(&request.Phone)
 
-	response, err := controller.Service.SendVideo(c.UserContext(), request)
+	appCtx := domainApp.NewAppContext(c.UserContext(), c)
+	response, err := controller.Service.SendVideo(appCtx, request)
 	utils.PanicIfNeeded(err)
 
 	return c.JSON(utils.ResponseData{
@@ -121,7 +130,8 @@ func (controller *Send) SendContact(c *fiber.Ctx) error {
 
 	utils.SanitizePhone(&request.Phone)
 
-	response, err := controller.Service.SendContact(c.UserContext(), request)
+	appCtx := domainApp.NewAppContext(c.UserContext(), c)
+	response, err := controller.Service.SendContact(appCtx, request)
 	utils.PanicIfNeeded(err)
 
 	return c.JSON(utils.ResponseData{
@@ -139,7 +149,8 @@ func (controller *Send) SendLink(c *fiber.Ctx) error {
 
 	utils.SanitizePhone(&request.Phone)
 
-	response, err := controller.Service.SendLink(c.UserContext(), request)
+	appCtx := domainApp.NewAppContext(c.UserContext(), c)
+	response, err := controller.Service.SendLink(appCtx, request)
 	utils.PanicIfNeeded(err)
 
 	return c.JSON(utils.ResponseData{
@@ -157,7 +168,8 @@ func (controller *Send) SendLocation(c *fiber.Ctx) error {
 
 	utils.SanitizePhone(&request.Phone)
 
-	response, err := controller.Service.SendLocation(c.UserContext(), request)
+	appCtx := domainApp.NewAppContext(c.UserContext(), c)
+	response, err := controller.Service.SendLocation(appCtx, request)
 	utils.PanicIfNeeded(err)
 
 	return c.JSON(utils.ResponseData{
@@ -180,7 +192,8 @@ func (controller *Send) SendAudio(c *fiber.Ctx) error {
 
 	utils.SanitizePhone(&request.Phone)
 
-	response, err := controller.Service.SendAudio(c.UserContext(), request)
+	appCtx := domainApp.NewAppContext(c.UserContext(), c)
+	response, err := controller.Service.SendAudio(appCtx, request)
 	utils.PanicIfNeeded(err)
 
 	return c.JSON(utils.ResponseData{
@@ -198,7 +211,8 @@ func (controller *Send) SendPoll(c *fiber.Ctx) error {
 
 	utils.SanitizePhone(&request.Phone)
 
-	response, err := controller.Service.SendPoll(c.UserContext(), request)
+	appCtx := domainApp.NewAppContext(c.UserContext(), c)
+	response, err := controller.Service.SendPoll(appCtx, request)
 	utils.PanicIfNeeded(err)
 
 	return c.JSON(utils.ResponseData{
@@ -214,7 +228,8 @@ func (controller *Send) SendPresence(c *fiber.Ctx) error {
 	err := c.BodyParser(&request)
 	utils.PanicIfNeeded(err)
 
-	response, err := controller.Service.SendPresence(c.UserContext(), request)
+	appCtx := domainApp.NewAppContext(c.UserContext(), c)
+	response, err := controller.Service.SendPresence(appCtx, request)
 	utils.PanicIfNeeded(err)
 
 	return c.JSON(utils.ResponseData{
@@ -232,7 +247,8 @@ func (controller *Send) SendChatPresence(c *fiber.Ctx) error {
 
 	utils.SanitizePhone(&request.Phone)
 
-	response, err := controller.Service.SendChatPresence(c.UserContext(), request)
+	appCtx := domainApp.NewAppContext(c.UserContext(), c)
+	response, err := controller.Service.SendChatPresence(appCtx, request)
 	utils.PanicIfNeeded(err)
 
 	return c.JSON(utils.ResponseData{

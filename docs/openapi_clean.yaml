@@ -1,0 +1,529 @@
+openapi: "3.0.0"
+info:
+  title: WhatsApp API MultiDevice
+  version: 6.9.0
+  description: |
+    This API is used for sending WhatsApp messages via REST API with multi-device support.
+    
+    ## Authentication
+    
+    This API uses HTTP Basic Authentication:
+    - **For WhatsApp API endpoints**: Use user credentials from database
+    - **For Admin endpoints** (/admin/*): Use admin credentials from environment
+    
+    ## Getting Started
+    
+    1. Configure admin credentials in environment variables
+    2. Use admin endpoints to create users for API access  
+    3. Use user credentials to access WhatsApp API endpoints
+    
+servers:
+  - url: http://localhost:3000
+    description: Local development server
+
+security:
+  - basicAuth: []
+
+tags:
+  - name: admin
+    description: User management (admin only)
+  - name: app
+    description: WhatsApp connection management
+  - name: user
+    description: User information and settings
+  - name: send
+    description: Send messages (text, image, file, video)
+  - name: message
+    description: Message operations (revoke, react, update)
+  - name: chat
+    description: Chat management
+  - name: group
+    description: Group management
+  - name: newsletter
+    description: Newsletter management
+
+paths:
+  # Admin User Management
+  /admin/users:
+    post:
+      tags:
+        - admin
+      summary: Create new user
+      description: Create a new user for WhatsApp API access (admin authentication required)
+      operationId: createUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - username
+                - password
+              properties:
+                username:
+                  type: string
+                  minLength: 3
+                  maxLength: 50
+                  example: "user1"
+                  description: Username (3-50 characters)
+                password:
+                  type: string
+                  minLength: 6
+                  example: "password123"
+                  description: Password (minimum 6 characters)
+      responses:
+        '200':
+          description: User created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    get:
+      tags:
+        - admin
+      summary: Get all users
+      description: Retrieve all users in the system (admin authentication required)
+      operationId: getAllUsers
+      responses:
+        '200':
+          description: Users retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: integer
+                    example: 200
+                  code:
+                    type: string
+                    example: "SUCCESS"
+                  message:
+                    type: string
+                    example: "Users retrieved successfully"
+                  results:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /admin/users/{id}:
+    get:
+      tags:
+        - admin
+      summary: Get user by ID
+      description: Retrieve a specific user by ID (admin authentication required)
+      operationId: getUserById
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 1
+          description: User ID
+      responses:
+        '200':
+          description: User retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    put:
+      tags:
+        - admin
+      summary: Update user
+      description: Update an existing user (admin authentication required)
+      operationId: updateUser
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 1
+          description: User ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                username:
+                  type: string
+                  minLength: 3
+                  maxLength: 50
+                  example: "updateduser1"
+                  description: Updated username (optional)
+                password:
+                  type: string
+                  minLength: 6
+                  example: "newpassword123"
+                  description: Updated password (optional)
+                is_active:
+                  type: boolean
+                  example: true
+                  description: User active status (optional)
+      responses:
+        '200':
+          description: User updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    delete:
+      tags:
+        - admin
+      summary: Delete user
+      description: Delete an existing user (admin authentication required)
+      operationId: deleteUser
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 1
+          description: User ID
+      responses:
+        '200':
+          description: User deleted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: integer
+                    example: 200
+                  code:
+                    type: string
+                    example: "SUCCESS"
+                  message:
+                    type: string
+                    example: "User deleted successfully"
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  # Admin WhatsApp Session Management
+  /admin/users/{id}/whatsapp/disconnect:
+    post:
+      tags:
+        - admin
+      summary: Disconnect WhatsApp session
+      description: Disconnect WhatsApp session for specific user (admin authentication required)
+      operationId: disconnectWhatsAppSession
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 1
+          description: User ID
+      responses:
+        '200':
+          description: WhatsApp session disconnected successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: integer
+                    example: 200
+                  code:
+                    type: string
+                    example: "SUCCESS"
+                  message:
+                    type: string
+                    example: "WhatsApp session disconnected successfully"
+                  results:
+                    type: object
+                    properties:
+                      user_id:
+                        type: integer
+                        example: 1
+                        description: User ID
+                      action:
+                        type: string
+                        example: "disconnect"
+                        description: Action performed
+                      status:
+                        type: string
+                        example: "disconnected"
+                        description: Current session status
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /admin/users/{id}/whatsapp/reconnect:
+    post:
+      tags:
+        - admin
+      summary: Reconnect WhatsApp session
+      description: Reconnect WhatsApp session for specific user (admin authentication required)
+      operationId: reconnectWhatsAppSession
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 1
+          description: User ID
+      responses:
+        '200':
+          description: WhatsApp session reconnected successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: integer
+                    example: 200
+                  code:
+                    type: string
+                    example: "SUCCESS"
+                  message:
+                    type: string
+                    example: "WhatsApp session reconnected successfully"
+                  results:
+                    type: object
+                    properties:
+                      user_id:
+                        type: integer
+                        example: 1
+                        description: User ID
+                      action:
+                        type: string
+                        example: "reconnect"
+                        description: Action performed
+                      status:
+                        type: string
+                        example: "connected"
+                        description: Current session status
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /admin/users/{id}/whatsapp/clear:
+    post:
+      tags:
+        - admin
+      summary: Clear WhatsApp session
+      description: |
+        Completely clear WhatsApp session and force logout for specific user (admin authentication required).
+        This will:
+        - Logout from WhatsApp server
+        - Clear all session data from database
+        - Remove temporary files
+        - Free up memory resources (~40-50MB)
+        - Prepare system for new login
+      operationId: clearWhatsAppSession
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 1
+          description: User ID
+      responses:
+        '200':
+          description: WhatsApp session cleared successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: integer
+                    example: 200
+                  code:
+                    type: string
+                    example: "SUCCESS"
+                  message:
+                    type: string
+                    example: "WhatsApp session cleared successfully"
+                  results:
+                    type: object
+                    properties:
+                      user_id:
+                        type: integer
+                        example: 1
+                        description: User ID
+                      action:
+                        type: string
+                        example: "clear"
+                        description: Action performed
+                      status:
+                        type: string
+                        example: "cleared"
+                        description: Current session status
+                      note:
+                        type: string
+                        example: "All session data removed, ready for new login"
+                        description: Additional information
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+components:
+  securitySchemes:
+    basicAuth:
+      type: http
+      scheme: basic
+      description: |
+        HTTP Basic Authentication.
+        Use admin credentials for /admin/* endpoints.
+        Use user credentials for other endpoints.
+
+  schemas:
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+          description: User ID
+        username:
+          type: string
+          example: "user1"
+          description: Username
+        is_active:
+          type: boolean
+          example: true
+          description: Whether the user is active
+        created_at:
+          type: string
+          format: date-time
+          example: "2024-01-15T10:30:00Z"
+          description: Creation timestamp
+        updated_at:
+          type: string
+          format: date-time
+          example: "2024-01-15T10:30:00Z"
+          description: Last update timestamp
+
+    UserResponse:
+      type: object
+      properties:
+        status:
+          type: integer
+          example: 200
+        code:
+          type: string
+          example: "SUCCESS"
+        message:
+          type: string
+          example: "Operation completed successfully"
+        results:
+          $ref: '#/components/schemas/User'
+
+    Error:
+      type: object
+      properties:
+        status:
+          type: integer
+          description: HTTP status code
+        code:
+          type: string
+          description: Error code
+        message:
+          type: string
+          description: Error message
+
+  responses:
+    BadRequest:
+      description: Bad Request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            status: 400
+            code: "BAD_REQUEST"
+            message: "Invalid request parameters"
+
+    Unauthorized:
+      description: Unauthorized
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            status: 401
+            code: "UNAUTHORIZED"
+            message: "Authentication required"
+
+    NotFound:
+      description: Not Found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            status: 404
+            code: "NOT_FOUND"
+            message: "Resource not found"
+
+    InternalServerError:
+      description: Internal Server Error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            status: 500
+            code: "INTERNAL_SERVER_ERROR"
+            message: "Internal server error"

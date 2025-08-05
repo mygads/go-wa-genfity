@@ -28,7 +28,15 @@
 </div>
 
 <div class="ui container" id="app" style="display: none;">
-    <div class="main-header">
+    <div class="main-header" style="position: relative;">
+        <!-- Logout Application Button (Desktop) -->
+        <div class="logout-app-container desktop-only" style="position: absolute; top: 10px; right: 10px;">
+            <button class="ui red button" @click="logoutApplication" title="Logout dari Aplikasi">
+                <i class="sign out icon"></i>
+                Logout App
+            </button>
+        </div>
+        
         <h1 class="ui header center aligned">
             <div class="title-container">
                 <img src="{{ .AppBasePath }}/assets/gowa.svg" alt="GoWA Logo">
@@ -271,6 +279,78 @@
         methods: {
             handleReloadDevice() {
                 this.app_ws.send(JSON.stringify({"code": "FETCH_DEVICES"}))
+            },
+            logoutApplication() {
+                // Show confirmation dialog
+                if (confirm('Apakah Anda yakin ingin logout dari aplikasi?\n\nNOTE: Untuk logout sepenuhnya dari Basic Auth, Anda perlu menutup browser tab/window ini setelah logout.')) {
+                    // Close WebSocket connection
+                    if (this.app_ws) {
+                        this.app_ws.close();
+                    }
+                    
+                    // Clear stored authentication
+                    delete window.http.defaults.headers.common['Authorization'];
+                    
+                    // Show success message
+                    showSuccessInfo('Logout berhasil! Silakan tutup tab browser ini atau klik "Refresh & Force Re-login" di bawah.');
+                    
+                    // Hide main app content and show logout message
+                    setTimeout(() => {
+                        document.getElementById('app').innerHTML = `
+                            <div style="text-align: center; padding: 50px; font-family: Arial, sans-serif;">
+                                <div style="background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 10px; padding: 30px; max-width: 500px; margin: 0 auto;">
+                                    <h2 style="color: #28a745;">✅ Logout Berhasil!</h2>
+                                    <p style="margin: 20px 0; color: #6c757d;">
+                                        Anda telah berhasil logout dari aplikasi WhatsApp API.
+                                    </p>
+                                    <div style="margin: 30px 0;">
+                                        <strong>Untuk keamanan maksimal:</strong>
+                                        <ul style="text-align: left; margin: 15px 0; color: #6c757d;">
+                                            <li>Tutup tab browser ini, atau</li>
+                                            <li>Klik tombol di bawah untuk force re-login</li>
+                                        </ul>
+                                    </div>
+                                    <button onclick="forceRelogin()" style="
+                                        background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+                                        color: white;
+                                        border: none;
+                                        padding: 12px 24px;
+                                        border-radius: 6px;
+                                        font-size: 16px;
+                                        cursor: pointer;
+                                        margin: 10px;
+                                    ">🔄 Refresh & Force Re-login</button>
+                                    <button onclick="window.close()" style="
+                                        background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+                                        color: white;
+                                        border: none;
+                                        padding: 12px 24px;
+                                        border-radius: 6px;
+                                        font-size: 16px;
+                                        cursor: pointer;
+                                        margin: 10px;
+                                    ">❌ Tutup Tab</button>
+                                </div>
+                            </div>
+                        `;
+                        
+                        // Add global function for force relogin
+                        window.forceRelogin = () => {
+                            // Try to clear browser auth by making request with invalid auth
+                            fetch(window.location.origin + '{{ .AppBasePath }}/app/devices', {
+                                method: 'GET',
+                                headers: {
+                                    'Authorization': 'Basic ' + btoa('invalid:invalid')
+                                }
+                            }).finally(() => {
+                                // Force reload after attempt
+                                setTimeout(() => {
+                                    window.location.reload(true);
+                                }, 500);
+                            });
+                        };
+                    }, 1500);
+                }
             }
         },
         mounted() {

@@ -391,3 +391,116 @@ body {
         image-rendering: crisp-edges;
     }
 }
+
+/* Logout App Button Styles */
+.logout-app-container {
+    z-index: 10;
+}
+
+.logout-app-container .ui.red.button {
+    background: linear-gradient(135deg, #dc3545 0%, #c82333 100%) !important;
+    border: none !important;
+    font-size: 0.9em !important;
+    padding: 0.6em 1.2em !important;
+    border-radius: 8px !important;
+    box-shadow: 0 2px 8px rgba(220, 53, 69, 0.3) !important;
+    transition: all 0.3s ease !important;
+}
+
+.logout-app-container .ui.red.button:hover {
+    background: linear-gradient(135deg, #c82333 0%, #a71e2a 100%) !important;
+    transform: translateY(-2px) !important;
+    box-shadow: 0 4px 12px rgba(220, 53, 69, 0.4) !important;
+}
+
+.logout-app-container .ui.red.button:active {
+    transform: translateY(0) !important;
+    box-shadow: 0 2px 6px rgba(220, 53, 69, 0.3) !important;
+}
+
+/* Responsive visibility classes */
+.desktop-only {
+    display: block;
+}
+
+.mobile-only {
+    display: none;
+}
+
+/* Logout page styling */
+.logout-page {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--background-color);
+}
+
+.logout-card {
+    background: white;
+    border-radius: 16px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+    padding: 40px;
+    max-width: 500px;
+    width: 90%;
+    text-align: center;
+    border: 1px solid rgba(0, 173, 216, 0.1);
+}
+
+.logout-card h2 {
+    color: var(--success-blue);
+    margin-bottom: 20px;
+    font-size: 1.8em;
+}
+
+.logout-card p {
+    color: #6c757d;
+    margin: 20px 0;
+    line-height: 1.6;
+}
+
+.logout-card ul {
+    text-align: left;
+    margin: 15px 0;
+    color: #6c757d;
+    line-height: 1.6;
+}
+
+.logout-card button {
+    transition: all 0.3s ease;
+    font-weight: 600;
+    margin: 5px;
+}
+
+.logout-card button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+/* Responsive styling for logout button */
+@media (max-width: 768px) {
+    .desktop-only {
+        display: none !important;
+    }
+    
+    .mobile-only {
+        display: block !important;
+    }
+    
+    .logout-app-container .ui.red.button {
+        font-size: 0.85em !important;
+        padding: 0.5em 1em !important;
+    }
+    
+    .logout-card {
+        padding: 30px 20px;
+        margin: 20px;
+    }
+    
+    .logout-card button {
+        width: 100%;
+        margin: 10px 0;
+        padding: 12px !important;
+    }
+}
+

@@ -12,7 +12,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func SetAutoConnectAfterBootingWithUserManagement(service domainApp.IAppUsecase, userManagementUsecase domainUserManagement.IUserManagementUsecase, chatStorageRepo domainChatStorage.IChatStorageRepository) {
+func SetAutoConnectAfterBootingWithUserManagement(service domainApp.IAppUsecaseWithContext, userManagementUsecase domainUserManagement.IUserManagementUsecase, chatStorageRepo domainChatStorage.IChatStorageRepository) {
 	time.Sleep(2 * time.Second)
 
 	ctx := context.Background()
@@ -22,8 +22,7 @@ func SetAutoConnectAfterBootingWithUserManagement(service domainApp.IAppUsecase,
 	users, err := userManagementUsecase.GetAllUsers()
 	if err != nil {
 		logrus.Errorf("Failed to get users from database: %v", err)
-		logrus.Info("Falling back to checking active sessions only...")
-		SetAutoConnectAfterBooting(service)
+		logrus.Info("Cannot proceed without user management database")
 		return
 	}
 
@@ -32,8 +31,7 @@ func SetAutoConnectAfterBootingWithUserManagement(service domainApp.IAppUsecase,
 	logrus.Infof("Total registered users in database: %d", len(users))
 
 	if len(users) == 0 {
-		logrus.Info("No users found in database. Reconnecting global client...")
-		_ = service.Reconnect(ctx)
+		logrus.Info("No users found in database. Please create users first.")
 		return
 	}
 
@@ -144,7 +142,7 @@ func SetAutoConnectAfterBootingWithUserManagement(service domainApp.IAppUsecase,
 	logrus.Info("=== Reconnection process completed for all user sessions ===")
 }
 
-func SetAutoConnectAfterBooting(service domainApp.IAppUsecase) {
+func SetAutoConnectAfterBooting(service domainApp.IAppUsecaseWithContext) {
 	time.Sleep(2 * time.Second)
 
 	// Get session manager to check all users
@@ -164,8 +162,6 @@ func SetAutoConnectAfterBooting(service domainApp.IAppUsecase) {
 	if len(activeSessions) == 0 {
 		logrus.Info("No active user sessions found.")
 		logrus.Info("Users need to login first to create WhatsApp sessions.")
-		logrus.Info("Reconnecting global client for backwards compatibility...")
-		_ = service.Reconnect(context.Background())
 		return
 	}
 

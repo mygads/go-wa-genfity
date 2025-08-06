@@ -173,8 +173,13 @@ func RegisterRoutes(app fiber.Router, service domainApp.IAppUsecaseWithContext) 
 							}
 							devices, err = service.FetchDevicesWithContext(appCtx)
 						} else {
-							logrus.Info("[WebSocket] Fetching devices using fallback method")
-							devices, err = service.FetchDevices(context.Background())
+							logrus.Error("[WebSocket] User ID required for device access in multi-user system")
+							Broadcast <- BroadcastMessage{
+								Code:    "FETCH_DEVICES_ERROR", 
+								Message: "User ID required for device access in multi-user system",
+								Result:  nil,
+							}
+							continue
 						}
 
 						if err != nil {

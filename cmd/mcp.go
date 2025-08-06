@@ -29,21 +29,19 @@ func init() {
 }
 
 func mcpServer(_ *cobra.Command, _ []string) {
-	// Initialize user management system for MCP server
+	// Initialize user management system for MCP server (required for multi-user system)
 	userManagementRepo, err := infraUserManagement.NewUserManagementRepository(config.UserManagementDBURI)
 	if err != nil {
-		logrus.Warnf("Failed to initialize user management repository: %v", err)
-		logrus.Info("Falling back to basic auto-connect without user management")
-		// Fall back to basic auto connect
-		go helpers.SetAutoConnectAfterBooting(appUsecase)
-		go helpers.SetAutoReconnectCheckingForAllUsers()
-	} else {
-		userManagementUsecase := usecase.NewUserManagementUsecase(userManagementRepo, chatStorageRepo)
-		// Set auto reconnect to whatsapp server after booting with user management support
-		go helpers.SetAutoConnectAfterBootingWithUserManagement(appUsecase, userManagementUsecase, chatStorageRepo)
-		// Set auto reconnect checking for all user sessions
-		go helpers.SetAutoReconnectCheckingForAllUsers()
+		logrus.Errorf("Failed to initialize user management repository: %v", err)
+		logrus.Error("User management is required for multi-user system. Please check database configuration.")
+		return
 	}
+
+	userManagementUsecase := usecase.NewUserManagementUsecase(userManagementRepo, chatStorageRepo)
+	// Set auto reconnect to whatsapp server after booting with user management support
+	go helpers.SetAutoConnectAfterBootingWithUserManagement(appUsecase, userManagementUsecase, chatStorageRepo)
+	// Set auto reconnect checking for all user sessions
+	go helpers.SetAutoReconnectCheckingForAllUsers()
 
 	// Create MCP server with capabilities
 	mcpServer := server.NewMCPServer(

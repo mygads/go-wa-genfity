@@ -275,21 +275,12 @@ func (u *userManagementUsecase) DisconnectWhatsAppSession(userID int) error {
 
 	// Get user-specific WhatsApp client for the user being disconnected
 	sessionManager := whatsapp.GetSessionManager()
-	client := sessionManager.GetUserClient(userID)
-	if client == nil {
-		return fmt.Errorf("WhatsApp client not found for user %s (ID: %d). User may not have active session.", user.Username, userID)
-	}
-
-	ctx := context.Background()
-
-	// Perform partial cleanup (like user logout but without server logout)
-	// This clears local data but keeps device registered with WhatsApp server
-	_, _, err = whatsapp.PerformPartialCleanupAndUpdateGlobals(ctx, fmt.Sprintf("ADMIN_DISCONNECT_USER_%d", userID), u.chatStorageRepo)
+	err = sessionManager.DisconnectUser(userID)
 	if err != nil {
 		return fmt.Errorf("failed to disconnect WhatsApp session for user %s (ID: %d): %v", user.Username, userID, err)
 	}
 
-	logrus.Infof("WhatsApp session disconnected for user %s (ID: %d) - device remains registered with server", user.Username, userID)
+	logrus.Infof("WhatsApp session disconnected for user %s (ID: %d)", user.Username, userID)
 	return nil
 }
 
@@ -358,8 +349,8 @@ func (u *userManagementUsecase) ClearWhatsAppSession(userID int) error {
 		}
 	}
 
-	// Perform complete cleanup (clears all data and RAM)
-	_, _, err = whatsapp.PerformCleanupAndUpdateGlobals(ctx, fmt.Sprintf("ADMIN_CLEAR_USER_%d", userID), u.chatStorageRepo)
+	// Remove user session completely (clears all data and RAM)
+	err = sessionManager.RemoveUserSession(userID)
 	if err != nil {
 		return fmt.Errorf("failed to clear WhatsApp session for user %s (ID: %d): %v", user.Username, userID, err)
 	}

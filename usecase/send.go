@@ -31,11 +31,11 @@ import (
 )
 
 type serviceSend struct {
-	appService      app.IAppUsecase
+	appService      app.IAppUsecaseWithContext
 	chatStorageRepo domainChatStorage.IChatStorageRepository
 }
 
-func NewSendService(appService app.IAppUsecase, chatStorageRepo domainChatStorage.IChatStorageRepository) domainSend.ISendUsecase {
+func NewSendService(appService app.IAppUsecaseWithContext, chatStorageRepo domainChatStorage.IChatStorageRepository) domainSend.ISendUsecase {
 	return &serviceSend{
 		appService:      appService,
 		chatStorageRepo: chatStorageRepo,

@@ -69,7 +69,8 @@ func (sm *SessionManager) CreateUserSession(ctx context.Context, userID int, use
 	var userKeysDBURI string
 	if config.DBKeysURI != "" {
 		if config.DBKeysURI == ":memory:" || config.DBKeysURI == "file::memory:?cache=shared&_foreign_keys=on" {
-			userKeysDBURI = fmt.Sprintf("file::memory:?cache=shared&_foreign_keys=on")
+			// Use per-user persistent keys database instead of memory to avoid FK constraints issues
+			userKeysDBURI = fmt.Sprintf("file:storages/user_%d_keys.db?_foreign_keys=on", userID)
 		} else {
 			userKeysDBURI = fmt.Sprintf("file:%s/user_%d_keys.db?_foreign_keys=on",
 				filepath.Dir(config.DBKeysURI[5:]), userID)

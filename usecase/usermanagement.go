@@ -4,10 +4,13 @@ import (
 	"context"
 	"fmt"
 
+	domainApp "github.com/aldinokemal/go-whatsapp-web-multidevice/domains/app"
 	domainChatStorage "github.com/aldinokemal/go-whatsapp-web-multidevice/domains/chatstorage"
 	domainUserManagement "github.com/aldinokemal/go-whatsapp-web-multidevice/domains/usermanagement"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/whatsapp"
+	pkgError "github.com/aldinokemal/go-whatsapp-web-multidevice/pkg/error"
 	"github.com/sirupsen/logrus"
+	"go.mau.fi/whatsmeow"
 )
 
 type userManagementUsecase struct {
@@ -20,6 +23,22 @@ func NewUserManagementUsecase(userRepo domainUserManagement.IUserManagementRepos
 		userRepo:        userRepo,
 		chatStorageRepo: chatStorageRepo,
 	}
+}
+
+// getClientFromContext extracts WhatsApp client from app context for user-specific operations
+func (u *userManagementUsecase) getClientFromContext(ctx context.Context) (*whatsmeow.Client, error) {
+	if appCtx, ok := ctx.(*domainApp.AppContext); ok {
+		if appCtx.UserID == 0 {
+			return nil, pkgError.ErrNotLoggedIn
+		}
+		client := whatsapp.GetClientForUser(appCtx.UserID)
+		if client == nil {
+			return nil, pkgError.ErrNotConnected
+		}
+		return client, nil
+	}
+	// Fallback for backwards compatibility (should not happen in production)
+	return whatsapp.GetClient(), nil
 }
 
 func (u *userManagementUsecase) CreateUser(request domainUserManagement.CreateUserRequest) (*domainUserManagement.UserResponse, error) {
@@ -253,7 +272,8 @@ func (u *userManagementUsecase) DisconnectWhatsAppSession(userID int) error {
 		return fmt.Errorf("user with ID %d not found", userID)
 	}
 
-	// Get WhatsApp client
+	// Get WhatsApp client - for admin operations, we use the global client as fallback
+	// since this is administrative function that may not have user context
 	client := whatsapp.GetClient()
 	if client == nil {
 		return fmt.Errorf("WhatsApp client not initialized")
@@ -283,7 +303,8 @@ func (u *userManagementUsecase) ReconnectWhatsAppSession(userID int) error {
 		return fmt.Errorf("user with ID %d not found", userID)
 	}
 
-	// Get WhatsApp client
+	// Get WhatsApp client - for admin operations, we use the global client as fallback
+	// since this is administrative function that may not have user context
 	client := whatsapp.GetClient()
 	if client == nil {
 		return fmt.Errorf("WhatsApp client not initialized")
@@ -316,6 +337,8 @@ func (u *userManagementUsecase) ClearWhatsAppSession(userID int) error {
 	}
 
 	// Get WhatsApp client
+	// Get WhatsApp client - for admin operations, we use the global client as fallback
+	// since this is administrative function that may not have user context
 	client := whatsapp.GetClient()
 	if client == nil {
 		return fmt.Errorf("WhatsApp client not initialized")

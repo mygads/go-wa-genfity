@@ -5,12 +5,15 @@ import (
 	"fmt"
 	"time"
 
+	domainApp "github.com/aldinokemal/go-whatsapp-web-multidevice/domains/app"
 	domainChat "github.com/aldinokemal/go-whatsapp-web-multidevice/domains/chat"
 	domainChatStorage "github.com/aldinokemal/go-whatsapp-web-multidevice/domains/chatstorage"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/whatsapp"
+	pkgError "github.com/aldinokemal/go-whatsapp-web-multidevice/pkg/error"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/pkg/utils"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/validations"
 	"github.com/sirupsen/logrus"
+	"go.mau.fi/whatsmeow"
 	"go.mau.fi/whatsmeow/appstate"
 )
 
@@ -22,6 +25,22 @@ func NewChatService(chatStorageRepo domainChatStorage.IChatStorageRepository) do
 	return &serviceChat{
 		chatStorageRepo: chatStorageRepo,
 	}
+}
+
+// getClientFromContext extracts WhatsApp client from app context for user-specific operations
+func (service serviceChat) getClientFromContext(ctx context.Context) (*whatsmeow.Client, error) {
+	if appCtx, ok := ctx.(*domainApp.AppContext); ok {
+		if appCtx.UserID == 0 {
+			return nil, pkgError.ErrNotLoggedIn
+		}
+		client := whatsapp.GetClientForUser(appCtx.UserID)
+		if client == nil {
+			return nil, pkgError.ErrNotConnected
+		}
+		return client, nil
+	}
+	// Fallback for backwards compatibility (should not happen in production)
+	return whatsapp.GetClient(), nil
 }
 
 func (service serviceChat) ListChats(ctx context.Context, request domainChat.ListChatsRequest) (response domainChat.ListChatsResponse, err error) {
@@ -208,8 +227,13 @@ func (service serviceChat) PinChat(ctx context.Context, request domainChat.PinCh
 		return response, err
 	}
 
+	client, err := service.getClientFromContext(ctx)
+	if err != nil {
+		return response, err
+	}
+
 	// Validate JID and ensure connection
-	targetJID, err := utils.ValidateJidWithLogin(whatsapp.GetClient(), request.ChatJID)
+	targetJID, err := utils.ValidateJidWithLogin(client, request.ChatJID)
 	if err != nil {
 		return response, err
 	}
@@ -218,7 +242,7 @@ func (service serviceChat) PinChat(ctx context.Context, request domainChat.PinCh
 	patchInfo := appstate.BuildPin(targetJID, request.Pinned)
 
 	// Send app state update
-	if err = whatsapp.GetClient().SendAppState(ctx, patchInfo); err != nil {
+	if err = client.SendAppState(ctx, patchInfo); err != nil {
 		logrus.WithError(err).WithFields(logrus.Fields{
 			"chat_jid": request.ChatJID,
 			"pinned":   request.Pinned,

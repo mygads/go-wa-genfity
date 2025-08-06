@@ -31,8 +31,27 @@ func NewAppService(chatStorageRepo domainChatStorage.IChatStorageRepository) dom
 	}
 }
 
-func (service *serviceApp) Login(_ context.Context) (response domainApp.LoginResponse, err error) {
-	client := whatsapp.GetClient()
+// getClientFromContext extracts WhatsApp client from app context for user-specific operations
+func (service serviceApp) getClientFromContext(ctx context.Context) (*whatsmeow.Client, error) {
+	if appCtx, ok := ctx.(*domainApp.AppContext); ok {
+		if appCtx.UserID == 0 {
+			return nil, pkgError.ErrNotLoggedIn
+		}
+		client := whatsapp.GetClientForUser(appCtx.UserID)
+		if client == nil {
+			return nil, pkgError.ErrNotConnected
+		}
+		return client, nil
+	}
+	// Fallback for backwards compatibility (should not happen in production)
+	return whatsapp.GetClient(), nil
+}
+
+func (service *serviceApp) Login(ctx context.Context) (response domainApp.LoginResponse, err error) {
+	client, err := service.getClientFromContext(ctx)
+	if err != nil {
+		return response, err
+	}
 	if client == nil {
 		return response, pkgError.ErrWaCLI
 	}
@@ -130,7 +149,10 @@ func (service *serviceApp) LoginWithCode(ctx context.Context, phoneNumber string
 		return loginCode, err
 	}
 
-	client := whatsapp.GetClient()
+	client, err := service.getClientFromContext(ctx)
+	if err != nil {
+		return loginCode, err
+	}
 	// detect is already logged in
 	if client.Store.ID != nil {
 		logrus.Warn("User is already logged in")
@@ -173,7 +195,11 @@ func (service *serviceApp) Logout(ctx context.Context) (err error) {
 
 	// [DEBUG] Call WhatsApp client logout first to disconnect from server
 	logrus.Info("[DEBUG] Calling WhatsApp client logout...")
-	err = whatsapp.GetClient().Logout(ctx)
+	client, err := service.getClientFromContext(ctx)
+	if err != nil {
+		return err
+	}
+	err = client.Logout(ctx)
 	if err != nil {
 		logrus.Errorf("[DEBUG] WhatsApp logout failed: %v", err)
 		// Continue with cleanup even if logout fails
@@ -203,10 +229,13 @@ func (service *serviceApp) Logout(ctx context.Context) (err error) {
 	return nil
 }
 
-func (service *serviceApp) Reconnect(_ context.Context) (err error) {
+func (service *serviceApp) Reconnect(ctx context.Context) (err error) {
 	logrus.Info("[DEBUG] Starting reconnect process...")
 
-	client := whatsapp.GetClient()
+	client, err := service.getClientFromContext(ctx)
+	if err != nil {
+		return err
+	}
 	client.Disconnect()
 	err = client.Connect()
 
@@ -227,7 +256,11 @@ func (service *serviceApp) Reconnect(_ context.Context) (err error) {
 }
 
 func (service *serviceApp) FirstDevice(ctx context.Context) (response domainApp.DevicesResponse, err error) {
-	if whatsapp.GetClient() == nil {
+	client, err := service.getClientFromContext(ctx)
+	if err != nil {
+		return response, err
+	}
+	if client == nil {
 		return response, pkgError.ErrWaCLI
 	}
 
@@ -247,7 +280,11 @@ func (service *serviceApp) FirstDevice(ctx context.Context) (response domainApp.
 }
 
 func (service *serviceApp) FetchDevices(ctx context.Context) (response []domainApp.DevicesResponse, err error) {
-	if whatsapp.GetClient() == nil {
+	client, err := service.getClientFromContext(ctx)
+	if err != nil {
+		return response, err
+	}
+	if client == nil {
 		return response, pkgError.ErrWaCLI
 	}
 

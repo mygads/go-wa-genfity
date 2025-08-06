@@ -37,8 +37,8 @@ func (u *userManagementUsecase) getClientFromContext(ctx context.Context) (*what
 		}
 		return client, nil
 	}
-	// Fallback for backwards compatibility (should not happen in production)
-	return whatsapp.GetClient(), nil
+	// In multi-user system, all operations must have user context
+	return nil, pkgError.ErrNotLoggedIn
 }
 
 func (u *userManagementUsecase) CreateUser(request domainUserManagement.CreateUserRequest) (*domainUserManagement.UserResponse, error) {
@@ -272,11 +272,11 @@ func (u *userManagementUsecase) DisconnectWhatsAppSession(userID int) error {
 		return fmt.Errorf("user with ID %d not found", userID)
 	}
 
-	// Get WhatsApp client - for admin operations, we use the global client as fallback
-	// since this is administrative function that may not have user context
-	client := whatsapp.GetClient()
+	// Get user-specific WhatsApp client for the user being disconnected
+	sessionManager := whatsapp.GetSessionManager()
+	client := sessionManager.GetUserClient(userID)
 	if client == nil {
-		return fmt.Errorf("WhatsApp client not initialized")
+		return fmt.Errorf("WhatsApp client not found for user %s (ID: %d). User may not have active session.", user.Username, userID)
 	}
 
 	ctx := context.Background()
@@ -303,11 +303,11 @@ func (u *userManagementUsecase) ReconnectWhatsAppSession(userID int) error {
 		return fmt.Errorf("user with ID %d not found", userID)
 	}
 
-	// Get WhatsApp client - for admin operations, we use the global client as fallback
-	// since this is administrative function that may not have user context
-	client := whatsapp.GetClient()
+	// Get user-specific WhatsApp client for reconnection
+	sessionManager := whatsapp.GetSessionManager()
+	client := sessionManager.GetUserClient(userID)
 	if client == nil {
-		return fmt.Errorf("WhatsApp client not initialized")
+		return fmt.Errorf("WhatsApp client not found for user %s (ID: %d). User may not have active session.", user.Username, userID)
 	}
 
 	// Reconnect if not connected
@@ -336,12 +336,11 @@ func (u *userManagementUsecase) ClearWhatsAppSession(userID int) error {
 		return fmt.Errorf("user with ID %d not found", userID)
 	}
 
-	// Get WhatsApp client
-	// Get WhatsApp client - for admin operations, we use the global client as fallback
-	// since this is administrative function that may not have user context
-	client := whatsapp.GetClient()
+	// Get user-specific WhatsApp client for logout
+	sessionManager := whatsapp.GetSessionManager()
+	client := sessionManager.GetUserClient(userID)
 	if client == nil {
-		return fmt.Errorf("WhatsApp client not initialized")
+		return fmt.Errorf("WhatsApp client not found for user %s (ID: %d). User may not have active session.", user.Username, userID)
 	}
 
 	ctx := context.Background()

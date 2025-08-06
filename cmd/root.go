@@ -29,15 +29,11 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"go.mau.fi/whatsmeow"
 )
 
 var (
 	EmbedIndex embed.FS
 	EmbedViews embed.FS
-
-	// Whatsapp
-	whatsappCli *whatsmeow.Client
 
 	// Chat Storage
 	chatStorageDB   *sql.DB

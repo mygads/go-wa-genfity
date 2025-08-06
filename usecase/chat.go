@@ -39,8 +39,8 @@ func (service serviceChat) getClientFromContext(ctx context.Context) (*whatsmeow
 		}
 		return client, nil
 	}
-	// Fallback for backwards compatibility (should not happen in production)
-	return whatsapp.GetClient(), nil
+	// In multi-user system, all operations must have user context
+	return nil, pkgError.ErrNotLoggedIn
 }
 
 func (service serviceChat) ListChats(ctx context.Context, request domainChat.ListChatsRequest) (response domainChat.ListChatsResponse, err error) {

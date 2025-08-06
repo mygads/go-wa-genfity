@@ -48,8 +48,8 @@ func (service serviceSend) getClientFromContext(ctx context.Context) *whatsmeow.
 	if appCtx, ok := ctx.(*app.AppContext); ok && appCtx.UserID > 0 {
 		return whatsapp.GetClientForUser(appCtx.UserID)
 	}
-	// Fallback to global client for backward compatibility
-	return whatsapp.GetClient()
+	// In multi-user system, all operations must have user context
+	return nil
 }
 
 // wrapSendMessage wraps the message sending process with message ID saving

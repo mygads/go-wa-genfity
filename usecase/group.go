@@ -35,8 +35,8 @@ func (service serviceGroup) getClientFromContext(ctx context.Context) (*whatsmeo
 		}
 		return client, nil
 	}
-	// Fallback for backwards compatibility (should not happen in production)
-	return whatsapp.GetClient(), nil
+	// In multi-user system, all operations must have user context
+	return nil, pkgError.ErrNotLoggedIn
 }
 
 func (service serviceGroup) JoinGroupWithLink(ctx context.Context, request domainGroup.JoinGroupWithLinkRequest) (groupID string, err error) {

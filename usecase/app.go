@@ -43,8 +43,8 @@ func (service serviceApp) getClientFromContext(ctx context.Context) (*whatsmeow.
 		}
 		return client, nil
 	}
-	// Fallback for backwards compatibility (should not happen in production)
-	return whatsapp.GetClient(), nil
+	// In multi-user system, all operations must have user context
+	return nil, pkgError.ErrNotLoggedIn
 }
 
 func (service *serviceApp) Login(ctx context.Context) (response domainApp.LoginResponse, err error) {
@@ -230,7 +230,7 @@ func (service *serviceApp) Logout(ctx context.Context) (err error) {
 }
 
 func (service *serviceApp) Reconnect(ctx context.Context) (err error) {
-	logrus.Info("[DEBUG] Starting reconnect process...")
+	logrus.Info("[DEBUG] Starting reconnect process for global client...")
 
 	client, err := service.getClientFromContext(ctx)
 	if err != nil {
@@ -240,18 +240,18 @@ func (service *serviceApp) Reconnect(ctx context.Context) (err error) {
 	err = client.Connect()
 
 	if err != nil {
-		logrus.Errorf("[DEBUG] Reconnect failed: %v", err)
+		logrus.Errorf("[DEBUG] Global client reconnect failed: %v", err)
 		return err
 	}
 
 	// [DEBUG] Verify reconnection state and sync global client
-	logrus.Infof("[DEBUG] Reconnection completed - IsConnected: %v, IsLoggedIn: %v",
+	logrus.Infof("[DEBUG] Global client reconnection completed - IsConnected: %v, IsLoggedIn: %v",
 		client.IsConnected(), client.IsLoggedIn())
 
 	// Ensure global client is synchronized with service client
 	whatsapp.UpdateGlobalClient(client, whatsapp.GetDB())
 
-	logrus.Info("[DEBUG] Reconnect process completed successfully")
+	logrus.Info("[DEBUG] Global client reconnect process completed successfully")
 	return err
 }
 

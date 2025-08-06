@@ -16,18 +16,14 @@ import (
 	domainChatStorage "github.com/aldinokemal/go-whatsapp-web-multidevice/domains/chatstorage"
 	pkgError "github.com/aldinokemal/go-whatsapp-web-multidevice/pkg/error"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/pkg/utils"
-	"github.com/aldinokemal/go-whatsapp-web-multidevice/ui/websocket"
 	"github.com/gofiber/fiber/v2"
 	"github.com/sirupsen/logrus"
 	"go.mau.fi/whatsmeow"
-	"go.mau.fi/whatsmeow/appstate"
-	"go.mau.fi/whatsmeow/proto/waE2E"
 	"go.mau.fi/whatsmeow/store"
 	"go.mau.fi/whatsmeow/store/sqlstore"
 	"go.mau.fi/whatsmeow/types"
 	"go.mau.fi/whatsmeow/types/events"
 	waLog "go.mau.fi/whatsmeow/util/log"
-	"google.golang.org/protobuf/proto"
 )
 
 // Type definitions
@@ -192,20 +188,11 @@ func GetDB() *sqlstore.Container {
 	return db
 }
 
-// GetConnectionStatus returns the current connection status of the global client
+// GetConnectionStatus returns the current connection status - deprecated in multi-user mode
 func GetConnectionStatus() (isConnected bool, isLoggedIn bool, deviceID string) {
-	if cli == nil {
-		return false, false, ""
-	}
-
-	isConnected = cli.IsConnected()
-	isLoggedIn = cli.IsLoggedIn()
-
-	if cli.Store != nil && cli.Store.ID != nil {
-		deviceID = cli.Store.ID.String()
-	}
-
-	return isConnected, isLoggedIn, deviceID
+	// In multi-user mode, global client status is not applicable
+	// Return default values to maintain compatibility
+	return false, false, "multi-user-mode"
 }
 
 // CleanupDatabase properly closes database connections and removes the database file
@@ -541,20 +528,13 @@ func handleDeleteForMe(ctx context.Context, evt *events.DeleteForMe, chatStorage
 }
 
 func handleAppStateSyncComplete(_ context.Context, evt *events.AppStateSyncComplete) {
-	if len(cli.Store.PushName) > 0 && evt.Name == appstate.WAPatchCriticalBlock {
-		if err := cli.SendPresence(types.PresenceAvailable); err != nil {
-			log.Warnf("Failed to send available presence: %v", err)
-		} else {
-			log.Infof("Marked self as available")
-		}
-	}
+	// AppState sync handling disabled in multi-user mode - would need per-user client context
+	log.Debugf("AppState sync complete event ignored in multi-user mode")
 }
 
 func handlePairSuccess(ctx context.Context, evt *events.PairSuccess) {
-	websocket.Broadcast <- websocket.BroadcastMessage{
-		Code:    "LOGIN_SUCCESS",
-		Message: fmt.Sprintf("Successfully pair with %s", evt.ID.String()),
-	}
+	// Pairing success handling disabled in multi-user mode
+	log.Infof("Pair success event ignored in multi-user mode for ID: %s", evt.ID.String())
 	syncKeysDevice(ctx, db, keysDB)
 }
 
@@ -565,25 +545,12 @@ func handleLoggedOut(ctx context.Context, chatStorageRepo domainChatStorage.ICha
 	handleRemoteLogout(ctx, chatStorageRepo)
 
 	// Broadcast final notification that cleanup is complete and ready for new login
-	websocket.Broadcast <- websocket.BroadcastMessage{
-		Code:    "LOGOUT_COMPLETE",
-		Message: "Remote logout cleanup completed - ready for new login",
-		Result:  nil,
-	}
+	log.Infof("Remote logout cleanup completed - ready for new login")
 }
 
 func handleConnectionEvents(_ context.Context) {
-	if len(cli.Store.PushName) == 0 {
-		return
-	}
-
-	// Send presence available when connecting and when the pushname is changed.
-	// This makes sure that outgoing messages always have the right pushname.
-	if err := cli.SendPresence(types.PresenceAvailable); err != nil {
-		log.Warnf("Failed to send available presence: %v", err)
-	} else {
-		log.Infof("Marked self as available")
-	}
+	// Connection events handling disabled in multi-user mode - would need per-user client context
+	log.Debugf("Connection event ignored in multi-user mode")
 }
 
 func handleStreamReplaced(_ context.Context) {
@@ -651,6 +618,11 @@ func handleAutoMarkRead(_ context.Context, evt *events.Message) {
 		return
 	}
 
+	if cli == nil {
+		log.Warnf("Client is nil, cannot mark message as read")
+		return
+	}
+
 	// Mark the message as read
 	messageIDs := []types.MessageID{evt.Info.ID}
 	timestamp := time.Now()
@@ -665,56 +637,8 @@ func handleAutoMarkRead(_ context.Context, evt *events.Message) {
 }
 
 func handleAutoReply(ctx context.Context, evt *events.Message, chatStorageRepo domainChatStorage.IChatStorageRepository) {
-	if config.WhatsappAutoReplyMessage != "" &&
-		!utils.IsGroupJID(evt.Info.Chat.String()) &&
-		!evt.Info.IsIncomingBroadcast() &&
-		!evt.Info.IsFromMe {
-
-		// Check if the incoming message has text content using the utility function
-		messageText := utils.ExtractMessageTextFromEvent(evt)
-		if messageText == "" {
-			return // Don't auto-reply to non-text messages
-		}
-
-		// Format recipient JID
-		recipientJID := utils.FormatJID(evt.Info.Sender.String())
-
-		// Send the auto-reply message
-		response, err := cli.SendMessage(
-			ctx,
-			recipientJID,
-			&waE2E.Message{Conversation: proto.String(config.WhatsappAutoReplyMessage)},
-		)
-
-		if err != nil {
-			log.Errorf("Failed to send auto-reply message: %v", err)
-			return
-		}
-
-		// Store the auto-reply message in chat storage if send was successful
-		if chatStorageRepo != nil {
-			// Get our own JID as sender
-			senderJID := ""
-			if cli.Store.ID != nil {
-				senderJID = cli.Store.ID.String()
-			}
-
-			// Store the sent auto-reply message
-			if err := chatStorageRepo.StoreSentMessageWithContext(
-				ctx,
-				response.ID,                     // Message ID from WhatsApp response
-				senderJID,                       // Our JID as sender
-				recipientJID.String(),           // Recipient JID
-				config.WhatsappAutoReplyMessage, // Auto-reply content
-				response.Timestamp,              // Timestamp from response
-			); err != nil {
-				// Log storage error but don't fail the auto-reply
-				log.Errorf("Failed to store auto-reply message in chat storage: %v", err)
-			} else {
-				log.Debugf("Auto-reply message %s stored successfully in chat storage", response.ID)
-			}
-		}
-	}
+	// Auto-reply disabled in multi-user mode - would need per-user client context
+	log.Debugf("Auto-reply not available in multi-user mode for message from %s", evt.Info.Sender.String())
 }
 
 func handleWebhookForward(ctx context.Context, evt *events.Message) {
@@ -779,10 +703,12 @@ func handleHistorySync(ctx context.Context, evt *events.HistorySync, chatStorage
 	}
 
 	id := atomic.AddInt32(&historySyncID, 1)
-	fileName := fmt.Sprintf("%s/history-%d-%s-%d-%s.json",
+
+	// In multi-user system, we can't rely on global client for device ID
+	// Use generic filename with timestamp and sync ID
+	fileName := fmt.Sprintf("%s/history-%d-multiuser-%d-%s.json",
 		config.PathStorages,
 		startupTime,
-		cli.Store.ID.String(),
 		id,
 		evt.Data.SyncType.String(),
 	)
@@ -902,14 +828,9 @@ func processConversationMessages(_ context.Context, data *waHistorySync.HistoryS
 			sender := ""
 			isFromMe := msgKey.GetFromMe()
 			if isFromMe {
-				// For self-messages, use the full JID format to match regular message processing
-				if cli.Store.ID != nil {
-					sender = cli.Store.ID.String() // Use full JID instead of just User part
-				} else {
-					// Skip messages where we can't determine the sender to avoid NOT NULL violations
-					log.Warnf("Skipping self-message %s: client ID unavailable", messageID)
-					continue
-				}
+				// For self-messages, skip as we don't have access to client store in this context
+				log.Debugf("Skipping self-message %s: no client context available", messageID)
+				continue
 			} else {
 				participant := msgKey.GetParticipant()
 				if participant != "" {

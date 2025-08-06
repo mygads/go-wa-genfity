@@ -130,10 +130,10 @@ func restServer(_ *cobra.Command, _ []string) {
 	websocket.RegisterRoutes(basicUserRoutes, appUsecase)
 	go websocket.RunHub()
 
-	// Set auto reconnect to whatsapp server after booting
-	go helpers.SetAutoConnectAfterBooting(appUsecase)
-	// Set auto reconnect checking
-	go helpers.SetAutoReconnectChecking(whatsappCli)
+	// Set auto reconnect to whatsapp server after booting with user management support
+	go helpers.SetAutoConnectAfterBootingWithUserManagement(appUsecase, userManagementUsecase, chatStorageRepo)
+	// Set auto reconnect checking for all user sessions
+	go helpers.SetAutoReconnectCheckingForAllUsers()
 
 	if err := app.Listen(":" + config.AppPort); err != nil {
 		logrus.Fatalln("Failed to start: ", err.Error())

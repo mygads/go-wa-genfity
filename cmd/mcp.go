@@ -6,8 +6,10 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/config"
+	infraUserManagement "github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/usermanagement"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/ui/mcp"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/ui/rest/helpers"
+	"github.com/aldinokemal/go-whatsapp-web-multidevice/usecase"
 	"github.com/mark3labs/mcp-go/server"
 	"github.com/spf13/cobra"
 )
@@ -27,10 +29,21 @@ func init() {
 }
 
 func mcpServer(_ *cobra.Command, _ []string) {
-	// Set auto reconnect to whatsapp server after booting
-	go helpers.SetAutoConnectAfterBooting(appUsecase)
-	// Set auto reconnect checking
-	go helpers.SetAutoReconnectChecking(whatsappCli)
+	// Initialize user management system for MCP server
+	userManagementRepo, err := infraUserManagement.NewUserManagementRepository(config.UserManagementDBURI)
+	if err != nil {
+		logrus.Warnf("Failed to initialize user management repository: %v", err)
+		logrus.Info("Falling back to basic auto-connect without user management")
+		// Fall back to basic auto connect
+		go helpers.SetAutoConnectAfterBooting(appUsecase)
+		go helpers.SetAutoReconnectCheckingForAllUsers()
+	} else {
+		userManagementUsecase := usecase.NewUserManagementUsecase(userManagementRepo, chatStorageRepo)
+		// Set auto reconnect to whatsapp server after booting with user management support
+		go helpers.SetAutoConnectAfterBootingWithUserManagement(appUsecase, userManagementUsecase, chatStorageRepo)
+		// Set auto reconnect checking for all user sessions
+		go helpers.SetAutoReconnectCheckingForAllUsers()
+	}
 
 	// Create MCP server with capabilities
 	mcpServer := server.NewMCPServer(

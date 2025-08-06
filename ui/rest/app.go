@@ -119,8 +119,8 @@ func (handler *App) ConnectionStatus(c *fiber.Ctx) error {
 		sessionManager := whatsapp.GetSessionManager()
 		isConnected, isLoggedIn, deviceID = sessionManager.GetUserConnectionStatus(userID)
 	} else {
-		// Fallback to global status
-		isConnected, isLoggedIn, deviceID = whatsapp.GetConnectionStatus()
+		// No global client in multi-user mode
+		isConnected, isLoggedIn, deviceID = false, false, "multi-user-mode"
 	}
 
 	return c.JSON(utils.ResponseData{

@@ -100,8 +100,9 @@ func (u *userManagementUsecase) GetUser(id int) (*domainUserManagement.UserRespo
 		return nil, fmt.Errorf("user not found")
 	}
 
-	// Get WhatsApp connection status
-	isConnected, isLoggedIn, _ := whatsapp.GetConnectionStatus()
+	// Get WhatsApp connection status for this specific user
+	sessionManager := whatsapp.GetSessionManager()
+	isConnected, isLoggedIn, _ := sessionManager.GetUserConnectionStatus(user.ID)
 
 	return &domainUserManagement.UserResponse{
 		ID:          user.ID,

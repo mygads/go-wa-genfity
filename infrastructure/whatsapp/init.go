@@ -134,7 +134,7 @@ func InitWaCLI(ctx context.Context, storeContainer, keysStoreContainer *sqlstore
 
 	// Create and configure the client
 	cli = whatsmeow.NewClient(device, waLog.Stdout("Client", config.WhatsappLogLevel, true))
-	cli.EnableAutoReconnect = true
+	cli.EnableAutoReconnect = false // Disable built-in auto-reconnect, we handle it smartly in session manager
 	cli.AutoTrustIdentity = true
 
 	cli.AddEventHandler(func(rawEvt interface{}) {

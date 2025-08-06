@@ -195,3 +195,89 @@ func (sm *SessionManager) GetOrCreateUserSession(ctx context.Context, userID int
 	// Create new session if it doesn't exist
 	return sm.CreateUserSession(ctx, userID, username, chatStorageRepo)
 }
+
+// ManualReconnectUser manually reconnects a specific user (for login attempts, QR scan, etc.)
+func (sm *SessionManager) ManualReconnectUser(userID int) error {
+	session := sm.GetUserSession(userID)
+	if session == nil {
+		return fmt.Errorf("user session not found for userID: %d", userID)
+	}
+
+	if session.Client == nil {
+		return fmt.Errorf("client not initialized for userID: %d", userID)
+	}
+
+	logrus.Infof("[MANUAL-RECONNECT] Connecting user %d (%s) to WhatsApp server...", userID, session.Username)
+
+	if err := session.Client.Connect(); err != nil {
+		logrus.Errorf("[MANUAL-RECONNECT] Failed to connect user %d (%s): %v", userID, session.Username, err)
+		return fmt.Errorf("failed to connect user %d: %v", userID, err)
+	}
+
+	logrus.Infof("[MANUAL-RECONNECT] User %d (%s) connected successfully", userID, session.Username)
+	return nil
+}
+
+// DisconnectUser manually disconnects a specific user (to save resources when not logged in)
+func (sm *SessionManager) DisconnectUser(userID int) error {
+	session := sm.GetUserSession(userID)
+	if session == nil {
+		return fmt.Errorf("user session not found for userID: %d", userID)
+	}
+
+	if session.Client == nil {
+		return fmt.Errorf("client not initialized for userID: %d", userID)
+	}
+
+	logrus.Infof("[MANUAL-DISCONNECT] Disconnecting user %d (%s) from WhatsApp server...", userID, session.Username)
+	session.Client.Disconnect()
+	logrus.Infof("[MANUAL-DISCONNECT] User %d (%s) disconnected successfully", userID, session.Username)
+	return nil
+}
+
+// ReconnectAllLoggedInUsers reconnects only users who are already logged in to WhatsApp
+func (sm *SessionManager) ReconnectAllLoggedInUsers() {
+	sm.mutex.RLock()
+	defer sm.mutex.RUnlock()
+
+	loggedInCount := 0
+	connectedCount := 0
+
+	for userID, session := range sm.sessions {
+		if session.Client != nil {
+			if session.Client.IsLoggedIn() {
+				loggedInCount++
+				if !session.Client.IsConnected() {
+					logrus.Infof("[RECONNECT-LOGGED-IN] Reconnecting logged-in user %d (%s)...", userID, session.Username)
+					if err := session.Client.Connect(); err != nil {
+						logrus.Errorf("[RECONNECT-LOGGED-IN] Failed to reconnect user %d (%s): %v", userID, session.Username, err)
+					} else {
+						connectedCount++
+						logrus.Infof("[RECONNECT-LOGGED-IN] User %d (%s) reconnected successfully", userID, session.Username)
+					}
+				} else {
+					connectedCount++
+				}
+			} else {
+				logrus.Debugf("[RECONNECT-LOGGED-IN] User %d (%s) not logged in, keeping disconnected", userID, session.Username)
+			}
+		}
+	}
+
+	logrus.Infof("[RECONNECT-LOGGED-IN] Summary: %d logged-in users, %d successfully connected", loggedInCount, connectedCount)
+}
+
+// HasStoredSession checks if a user has stored WhatsApp session data (previously logged in)
+func (sm *SessionManager) HasStoredSession(userID int) bool {
+	session := sm.GetUserSession(userID)
+	if session == nil || session.Client == nil {
+		return false
+	}
+
+	// Check if there's stored session data in the database
+	if session.Client.Store != nil && session.Client.Store.ID != nil {
+		return true
+	}
+
+	return false
+}

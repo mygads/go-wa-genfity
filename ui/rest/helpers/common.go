@@ -10,7 +10,6 @@ import (
 	domainUserManagement "github.com/aldinokemal/go-whatsapp-web-multidevice/domains/usermanagement"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/whatsapp"
 	"github.com/sirupsen/logrus"
-	"go.mau.fi/whatsmeow"
 )
 
 func SetAutoConnectAfterBootingWithUserManagement(service domainApp.IAppUsecase, userManagementUsecase domainUserManagement.IUserManagementUsecase, chatStorageRepo domainChatStorage.IChatStorageRepository) {
@@ -58,20 +57,35 @@ func SetAutoConnectAfterBootingWithUserManagement(service domainApp.IAppUsecase,
 
 		activeSessionCount++
 
-		// Get connection status
+		// Get or create session but don't connect yet
+		_, err = sessionManager.GetOrCreateUserSession(ctx, user.ID, user.Username, chatStorageRepo)
+		if err != nil {
+			logrus.Errorf("Failed to create session for user %d (%s): %v", user.ID, user.Username, err)
+			continue
+		}
+
+		// Check if user has stored session data (previously logged in)
+		hasStoredSession := sessionManager.HasStoredSession(user.ID)
+
+		// Get current connection status (might be false if not connected yet)
 		isConnected, isLoggedIn, deviceID := sessionManager.GetUserConnectionStatus(user.ID)
 
 		status := "DISCONNECTED"
-		if isConnected && isLoggedIn {
-			status = "CONNECTED & LOGGED IN"
-			connectedCount++
-			loggedInCount++
-		} else if isConnected {
-			status = "CONNECTED (NOT LOGGED IN)"
-			connectedCount++
-		} else if isLoggedIn {
-			status = "LOGGED IN (NOT CONNECTED)"
-			loggedInCount++
+		if hasStoredSession {
+			if isConnected && isLoggedIn {
+				status = "CONNECTED & LOGGED IN"
+				connectedCount++
+				loggedInCount++
+			} else if isConnected {
+				status = "CONNECTED (NOT LOGGED IN)"
+				connectedCount++
+			} else if isLoggedIn {
+				status = "LOGGED IN (NOT CONNECTED)"
+				loggedInCount++
+			} else {
+				status = "HAS SESSION DATA (DISCONNECTED)"
+				loggedInCount++ // Count as potentially logged in
+			}
 		}
 
 		deviceInfo := ""
@@ -86,8 +100,7 @@ func SetAutoConnectAfterBootingWithUserManagement(service domainApp.IAppUsecase,
 	logrus.Info("===========================================")
 
 	if activeSessionCount == 0 {
-		logrus.Info("No active sessions to reconnect. Reconnecting global client...")
-		_ = service.Reconnect(ctx)
+		logrus.Info("No active sessions to reconnect.")
 		return
 	}
 
@@ -128,7 +141,6 @@ func SetAutoConnectAfterBootingWithUserManagement(service domainApp.IAppUsecase,
 		}
 	}
 
-	// No need for global client in multi-user system
 	logrus.Info("=== Reconnection process completed for all user sessions ===")
 }
 
@@ -188,47 +200,60 @@ func SetAutoConnectAfterBooting(service domainApp.IAppUsecase) {
 	logrus.Infof("Summary: %d connected, %d logged in out of %d active sessions", connectedCount, loggedInCount, len(activeSessions))
 	logrus.Info("===========================================")
 
-	// Reconnect all users with active sessions
-	logrus.Info("Starting reconnection process for all active user sessions...")
+	// Smart reconnection: Only reconnect users who are already logged in to WhatsApp
+	logrus.Info("Starting smart reconnection process (only for logged-in users)...")
+
+	reconnectedCount := 0
+	skippedCount := 0
 
 	for userID, session := range activeSessions {
-		logrus.Infof("[USER %d] Starting reconnect process for user %s...", userID, session.Username)
-
 		if session.Client == nil {
-			logrus.Errorf("[USER %d] Client is nil for user %s, skipping reconnect", userID, session.Username)
+			logrus.Errorf("[USER %d] Client is nil for user %s, skipping", userID, session.Username)
+			skippedCount++
 			continue
 		}
 
-		// Disconnect first
-		session.Client.Disconnect()
+		// Check if user is logged in to WhatsApp first
+		if session.Client.IsLoggedIn() {
+			logrus.Infof("[USER %d] User %s is logged in, performing reconnect...", userID, session.Username)
 
-		// Reconnect
-		err := session.Client.Connect()
-		if err != nil {
-			logrus.Errorf("[USER %d] Reconnect failed for user %s: %v", userID, session.Username, err)
-		} else {
-			isConnected := session.Client.IsConnected()
-			isLoggedIn := session.Client.IsLoggedIn()
+			// Disconnect first to ensure clean reconnect
+			session.Client.Disconnect()
 
-			status := "DISCONNECTED"
-			if isConnected && isLoggedIn {
-				status = "CONNECTED & LOGGED IN"
-			} else if isConnected {
-				status = "CONNECTED (NOT LOGGED IN)"
-			} else if isLoggedIn {
-				status = "LOGGED IN (NOT CONNECTED)"
+			// Reconnect
+			err := session.Client.Connect()
+			if err != nil {
+				logrus.Errorf("[USER %d] Reconnect failed for user %s: %v", userID, session.Username, err)
+			} else {
+				reconnectedCount++
+				isConnected := session.Client.IsConnected()
+				isLoggedIn := session.Client.IsLoggedIn()
+
+				status := "DISCONNECTED"
+				if isConnected && isLoggedIn {
+					status = "CONNECTED & LOGGED IN"
+				} else if isConnected {
+					status = "CONNECTED (NOT LOGGED IN)"
+				} else if isLoggedIn {
+					status = "LOGGED IN (NOT CONNECTED)"
+				}
+
+				logrus.Infof("[USER %d] Reconnection completed for user %s - Status: %s", userID, session.Username, status)
 			}
-
-			logrus.Infof("[USER %d] Reconnection completed for user %s - Status: %s",
-				userID, session.Username, status)
+		} else {
+			// User not logged in - keep disconnected to save resources
+			logrus.Infof("[USER %d] User %s not logged in to WhatsApp, keeping disconnected to save resources", userID, session.Username)
+			session.Client.Disconnect()
+			skippedCount++
 		}
 	}
 
-	logrus.Info("=== Reconnection process completed for all active sessions ===")
+	logrus.Infof("=== Smart reconnection completed: %d reconnected, %d skipped (not logged in) ===", reconnectedCount, skippedCount)
 }
 
 func SetAutoReconnectCheckingForAllUsers() {
-	// Run every 5 minutes to check if all user connections are still alive, if not, reconnect
+	// Run every 5 minutes to check if all user connections are still alive
+	// Only reconnect if user is already logged in (has active WhatsApp session)
 	go func() {
 		for {
 			time.Sleep(5 * time.Minute)
@@ -238,25 +263,19 @@ func SetAutoReconnectCheckingForAllUsers() {
 
 			for userID, session := range activeSessions {
 				if session.Client != nil && !session.Client.IsConnected() {
-					logrus.Infof("[AUTO-RECONNECT] User %d (%s) disconnected, attempting reconnection...", userID, session.Username)
-					if err := session.Client.Connect(); err != nil {
-						logrus.Errorf("[AUTO-RECONNECT] Failed to reconnect user %d (%s): %v", userID, session.Username, err)
+					// Only reconnect if user is already logged in to WhatsApp
+					if session.Client.IsLoggedIn() {
+						logrus.Infof("[AUTO-RECONNECT] User %d (%s) was logged in but disconnected, attempting reconnection...", userID, session.Username)
+						if err := session.Client.Connect(); err != nil {
+							logrus.Errorf("[AUTO-RECONNECT] Failed to reconnect logged-in user %d (%s): %v", userID, session.Username, err)
+						} else {
+							logrus.Infof("[AUTO-RECONNECT] User %d (%s) reconnected successfully", userID, session.Username)
+						}
 					} else {
-						logrus.Infof("[AUTO-RECONNECT] User %d (%s) reconnected successfully", userID, session.Username)
+						// User not logged in - let the connection stay disconnected to save resources
+						logrus.Debugf("[AUTO-RECONNECT] User %d (%s) not logged in, keeping connection disconnected to save resources", userID, session.Username)
 					}
 				}
-			}
-		}
-	}()
-}
-
-func SetAutoReconnectChecking(cli *whatsmeow.Client) {
-	// Run every 5 minutes to check if the connection is still alive, if not, reconnect
-	go func() {
-		for {
-			time.Sleep(5 * time.Minute)
-			if !cli.IsConnected() {
-				_ = cli.Connect()
 			}
 		}
 	}()

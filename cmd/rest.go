@@ -83,6 +83,20 @@ func restServer(_ *cobra.Command, _ []string) {
 
 	// Homepage route (protected with basic user authentication but not session middleware)
 	apiGroup.Get("/", middleware.UserBasicAuth(userManagementUsecase), func(c *fiber.Ctx) error {
+		// Extract user information for display
+		var userID int
+		var username string
+		if id := c.Locals("user_id"); id != nil {
+			if uid, ok := id.(int); ok {
+				userID = uid
+			}
+		}
+		if name := c.Locals("username"); name != nil {
+			if uname, ok := name.(string); ok {
+				username = uname
+			}
+		}
+
 		return c.Render("views/index", fiber.Map{
 			"AppHost":        fmt.Sprintf("%s://%s", c.Protocol(), c.Hostname()),
 			"AppVersion":     config.AppVersion,
@@ -90,6 +104,8 @@ func restServer(_ *cobra.Command, _ []string) {
 			"BasicAuthToken": c.UserContext().Value(middleware.AuthorizationValue("BASIC_AUTH")),
 			"MaxFileSize":    humanize.Bytes(uint64(config.WhatsappSettingMaxFileSize)),
 			"MaxVideoSize":   humanize.Bytes(uint64(config.WhatsappSettingMaxVideoSize)),
+			"UserID":         userID,
+			"Username":       username,
 		})
 	})
 

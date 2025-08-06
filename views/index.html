@@ -29,6 +29,15 @@
 
 <div class="ui container" id="app" style="display: none;">
     <div class="main-header" style="position: relative;">
+        <!-- User Info Display -->
+        <div class="user-info-container" style="position: absolute; top: 10px; left: 10px;">
+            <div class="ui small blue label">
+                <i class="user icon"></i>
+                User: <strong>{{ .Username }}</strong>
+                <div class="detail">ID: {{ .UserID }}</div>
+            </div>
+        </div>
+        
         <!-- Logout Application Button (Desktop) -->
         <div class="logout-app-container desktop-only" style="position: absolute; top: 10px; right: 10px;">
             <button class="ui red button" @click="logoutApplication" title="Logout dari Aplikasi">
@@ -39,7 +48,6 @@
         
         <h1 class="ui header center aligned">
             <div class="title-container">
-                <img src="{{ .AppBasePath }}/assets/gowa.svg" alt="GoWA Logo">
                 
                 <span>WhatsApp API</span>
                 
@@ -48,6 +56,18 @@
                 </div>
             </div>
         </h1>
+
+        <!-- Multi-User Status Info -->
+        <div class="ui info message" style="margin-top: 15px;">
+            <div class="header">
+                <i class="users icon"></i>
+                Multi-User Session Active
+            </div>
+            <p>
+                Anda sedang menggunakan sesi terpisah dengan isolasi penuh dari user lain. 
+                Semua operasi WhatsApp (send, group, message) menggunakan client khusus untuk user <strong>{{ .Username }}</strong>.
+            </p>
+        </div>
     </div>
 
     <div class="ui success message" v-if="connected_devices != null">
@@ -395,6 +415,11 @@
                             break;
                         case 'LIST_DEVICES':
                             this.connected_devices = message.result
+                            break;
+                        case 'FETCH_DEVICES_ERROR':
+                            // Handle device fetching error from WebSocket
+                            showErrorInfo('Failed to fetch devices: ' + message.message)
+                            console.error('[WebSocket] Device fetch error:', message.message)
                             break;
                         case 'LOGOUT_COMPLETE':
                             // Handle successful cleanup after remote logout

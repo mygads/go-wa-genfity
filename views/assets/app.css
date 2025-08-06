@@ -11,6 +11,50 @@
     --success-blue: #00ADD8;
 }
 
+/* User Info Styles */
+.user-info-container .ui.label {
+    font-size: 0.9em !important;
+    font-weight: normal !important;
+    background: rgba(255, 255, 255, 0.95) !important;
+    color: var(--primary-color) !important;
+    border: 1px solid rgba(0, 173, 216, 0.3) !important;
+    box-shadow: 0 4px 12px rgba(0, 173, 216, 0.15) !important;
+    backdrop-filter: blur(8px) !important;
+    border-radius: 8px !important;
+}
+
+.user-info-container .ui.label .detail {
+    color: #666 !important;
+    font-size: 0.85em !important;
+    margin-left: 5px !important;
+}
+
+/* Multi-User Info Message */
+.ui.info.message {
+    background: linear-gradient(135deg, #e8f6ff 0%, #f0f9ff 100%) !important;
+    border: 1px solid rgba(0, 173, 216, 0.2) !important;
+    border-left: 4px solid var(--primary-color) !important;
+}
+
+.ui.info.message .header {
+    color: var(--primary-color) !important;
+}
+
+/* Responsive adjustments for user info */
+@media (max-width: 768px) {
+    .user-info-container {
+        position: static !important;
+        text-align: center;
+        margin-bottom: 10px;
+    }
+    
+    .logout-app-container {
+        position: static !important;
+        text-align: center;
+        margin-top: 10px;
+    }
+}
+
 body {
     background-color: var(--background-color) !important;
     color: var(--text-color) !important;

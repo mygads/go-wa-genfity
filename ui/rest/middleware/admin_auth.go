@@ -112,7 +112,21 @@ func UserBasicAuth(userUsecase domainUserManagement.IUserManagementUsecase) fibe
 		username, password := pair[0], pair[1]
 
 		// Validate user credentials from database
+		user, err := userUsecase.GetUserByUsername(username)
+		if err != nil || user == nil {
+			return c.Status(fiber.StatusUnauthorized).JSON(utils.ResponseData{
+				Status:  fiber.StatusUnauthorized,
+				Code:    "UNAUTHORIZED",
+				Message: "Invalid user credentials",
+			})
+		}
+
 		if userUsecase.ValidateUserCredentials(username, password) {
+			// Store user info in context for template rendering
+			c.Locals("user_id", user.ID)
+			c.Locals("username", user.Username)
+			
+			logrus.Debugf("UserBasicAuth: Authenticated user %s (ID: %d)", user.Username, user.ID)
 			return c.Next()
 		}
 

@@ -21,21 +21,28 @@
 <body>
 <div id="splash-screen">
     <!-- Clean squircle logo without background wrapper -->
-    <img src="{{ .AppBasePath }}/assets/gowa.svg" alt="GoWA Logo" class="splash-icon" id="main-logo">
-    
-    <h2 class="splash-title">WhatsApp API</h2>
+    <img src="{{ .AppBasePath }}/assets/logo-light.svg" alt="Genfity Logo" class="splash-icon" id="main-logo">
+
+    <h2 class="splash-title">Genfity WhatsApp API</h2>
     <div class="ui active large inline loader splash-spinner"></div>
 </div>
 
 <div class="ui container" id="app" style="display: none;">
     <div class="main-header" style="position: relative;">
-        <!-- User Info Display -->
-        <div class="user-info-container" style="position: absolute; top: 10px; left: 10px;">
-            <div class="ui small blue label">
+        <!-- User Info Display - Made more visible -->
+        <div class="user-info-container" style="position: absolute; top: 5px; left: 5px; z-index: 1000;">
+            {{ if and .Username .UserID }}
+            <div class="ui small teal label" style="background: #17a2b8 !important; color: white !important; font-weight: bold !important;">
                 <i class="user icon"></i>
-                User: <strong>{{ .Username }}</strong>
-                <div class="detail">ID: {{ .UserID }}</div>
+                {{ .Username }}
+                <div class="detail !important">ID: {{ .UserID }}</div>
             </div>
+            {{ else }}
+            <div class="ui small orange label" style="background: #fd7e14 !important; color: white !important;">
+                <i class="exclamation triangle icon"></i>
+                User Info Missing
+            </div>
+            {{ end }}
         </div>
         
         <!-- Logout Application Button (Desktop) -->
@@ -48,8 +55,9 @@
         
         <h1 class="ui header center aligned">
             <div class="title-container">
+                <img src="{{ .AppBasePath }}/assets/logo-light.svg" alt="Genfity Logo" style="margin-right: 15px;">
                 
-                <span>WhatsApp API</span>
+                <span>Genfity WhatsApp API</span>
                 
                 <div class="version-label">
                     {{ .AppVersion }}
@@ -64,8 +72,12 @@
                 Multi-User Session Active
             </div>
             <p>
-                Anda sedang menggunakan sesi terpisah dengan isolasi penuh dari user lain. 
-                Semua operasi WhatsApp (send, group, message) menggunakan client khusus untuk user <strong>{{ .Username }}</strong>.
+                {{ if .Username }}
+                You are currently using a separate session fully isolated from other users.
+                All WhatsApp operations (send, group, message) use a dedicated client for user <strong>{{ .Username }}</strong>.
+                {{ else }}
+                <span style="color: red;">⚠️ DEBUG: User info not found. Username: "{{ .Username }}", UserID: "{{ .UserID }}"</span>
+                {{ end }}
             </p>
         </div>
     </div>
@@ -302,7 +314,7 @@
             },
             logoutApplication() {
                 // Show confirmation dialog
-                if (confirm('Apakah Anda yakin ingin logout dari aplikasi?\n\nNOTE: Untuk logout sepenuhnya dari Basic Auth, Anda perlu menutup browser tab/window ini setelah logout.')) {
+                if (confirm('Are you sure you want to logout from the application?\n\nNOTE: To fully logout from Basic Auth, you need to close this browser tab/window after logout.')) {
                     // Close WebSocket connection
                     if (this.app_ws) {
                         this.app_ws.close();
@@ -312,22 +324,22 @@
                     delete window.http.defaults.headers.common['Authorization'];
                     
                     // Show success message
-                    showSuccessInfo('Logout berhasil! Silakan tutup tab browser ini atau klik "Refresh & Force Re-login" di bawah.');
+                    showSuccessInfo('Logout successful! Please close this browser tab or click "Refresh & Force Re-login" below.');
                     
                     // Hide main app content and show logout message
                     setTimeout(() => {
                         document.getElementById('app').innerHTML = `
                             <div style="text-align: center; padding: 50px; font-family: Arial, sans-serif;">
                                 <div style="background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 10px; padding: 30px; max-width: 500px; margin: 0 auto;">
-                                    <h2 style="color: #28a745;">✅ Logout Berhasil!</h2>
+                                    <h2 style="color: #28a745;">✅ Logout Successful!</h2>
                                     <p style="margin: 20px 0; color: #6c757d;">
-                                        Anda telah berhasil logout dari aplikasi WhatsApp API.
+                                        You have successfully logged out from the WhatsApp API application.
                                     </p>
                                     <div style="margin: 30px 0;">
-                                        <strong>Untuk keamanan maksimal:</strong>
+                                        <strong>For maximum security:</strong>
                                         <ul style="text-align: left; margin: 15px 0; color: #6c757d;">
-                                            <li>Tutup tab browser ini, atau</li>
-                                            <li>Klik tombol di bawah untuk force re-login</li>
+                                            <li>Close this browser tab, or</li>
+                                            <li>Click the button below to force re-login</li>
                                         </ul>
                                     </div>
                                     <button onclick="forceRelogin()" style="
@@ -349,7 +361,7 @@
                                         font-size: 16px;
                                         cursor: pointer;
                                         margin: 10px;
-                                    ">❌ Tutup Tab</button>
+                                    ">❌ Close Tab</button>
                                 </div>
                             </div>
                         `;

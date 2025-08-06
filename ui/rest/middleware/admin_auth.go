@@ -125,7 +125,7 @@ func UserBasicAuth(userUsecase domainUserManagement.IUserManagementUsecase) fibe
 			// Store user info in context for template rendering
 			c.Locals("user_id", user.ID)
 			c.Locals("username", user.Username)
-			
+
 			logrus.Debugf("UserBasicAuth: Authenticated user %s (ID: %d)", user.Username, user.ID)
 			return c.Next()
 		}

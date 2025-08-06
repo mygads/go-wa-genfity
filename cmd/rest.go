@@ -97,6 +97,9 @@ func restServer(_ *cobra.Command, _ []string) {
 			}
 		}
 
+		// Debug logging
+		logrus.Infof("[DEBUG] Template render - UserID: %d, Username: %s", userID, username)
+
 		return c.Render("views/index", fiber.Map{
 			"AppHost":        fmt.Sprintf("%s://%s", c.Protocol(), c.Hostname()),
 			"AppVersion":     config.AppVersion,
